@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171629">
+  <meta name="description" content="コインを作って工場を大きくする、レトロ風クリック放置ゲーム。">
+  <title>無限コイン工場</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #171629;
+      --panel: #292842;
+      --panel-light: #393653;
+      --cream: #fff3cf;
+      --muted: #c3bdd9;
+      --gold: #ffd34e;
+      --mint: #83e6ae;
+      --pink: #ff8fa3;
+      --edge: #0c0b18;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background-color: var(--ink);
+      background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 4px 4px;
+      color: var(--cream);
+      font-family: "Courier New", "Yu Gothic UI", monospace;
+      image-rendering: pixelated;
+    }
+    button { font: inherit; color: inherit; }
+    button:not(:disabled) { transition: translate 70ms steps(2,end), filter 70ms linear, box-shadow 70ms linear; }
+    button:not(:disabled):active { translate: 0 3px; filter: brightness(.9); }
+    .shell { width: min(1080px, 100%); margin: 0 auto; padding: 22px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    h1 { margin: 0; font-size: clamp(18px, 3vw, 28px); letter-spacing: .04em; text-shadow: 3px 3px 0 #7c4bb5; }
+    .top-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .small-button, .tab-button { border: 2px solid var(--edge); background: var(--panel-light); box-shadow: 0 3px 0 var(--edge); padding: 9px 12px; cursor: pointer; }
+    .small-button:active, .tab-button:active { box-shadow: 0 0 0 var(--edge); }
+    .small-button:hover, .tab-button:hover { filter: brightness(1.18); }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .stat { padding: 14px 16px; background: var(--panel); border: 3px solid var(--edge); box-shadow: inset 0 0 0 2px #484563, 4px 4px 0 #080812; }
+    .stat-label { color: var(--muted); font-size: 12px; }
+    .stat-value { margin-top: 5px; color: var(--gold); font-size: clamp(20px, 4vw, 30px); font-weight: bold; overflow-wrap: anywhere; }
+    .stat-value.rate { color: var(--mint); }
+    .columns { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(330px, .95fr); gap: 16px; align-items: start; }
+    .panel { border: 3px solid var(--edge); background: var(--panel); box-shadow: inset 0 0 0 2px #484563, 4px 4px 0 #080812; }
+    .factory { padding: 18px; text-align: center; overflow: hidden; }
+    .factory-scene { position: relative; min-height: 276px; display: grid; place-items: center; margin-bottom: 12px; border: 2px solid #111020; background: linear-gradient(#454274 0 69%, #292646 69%); overflow: hidden; }
+    .factory-scene[data-zone="large"] { background: linear-gradient(#5b5687 0 69%,#343050 69%); }
+    .factory-scene[data-zone="large"] .factory-building { transform: scale(1.06); transform-origin: bottom center; }
+    .factory-scene[data-zone="gold"] { background: linear-gradient(#725d71 0 69%,#3b304e 69%); }
+    .factory-scene[data-zone="gold"] .factory-building { filter: sepia(.28) saturate(1.35); }
+    .factory-scene[data-zone="space"] { background: linear-gradient(#302d62 0 69%,#211c45 69%); }
+    .factory-scene[data-zone="space"] .factory-building { filter: hue-rotate(28deg) saturate(1.25); }
+    .factory-scene[data-press="true"] .press-machine { animation: press-bob .7s steps(2,end) infinite alternate; }
+    .factory-scene[data-belt="true"] .belt { height: 27px; background: repeating-linear-gradient(90deg,#b77e48 0 14px,#f0c367 14px 20px); }
+    .factory-scene[data-robot="true"] .worker { display: block !important; }
+    @keyframes press-bob { to { translate: 0 3px; } }
+    .stars { position: absolute; inset: 0; opacity: .7; background-image: radial-gradient(#fff3cf 1px, transparent 1.5px); background-size: 39px 35px; }
+    .moon { position: absolute; top: 23px; right: 13%; width: 28px; height: 28px; background: var(--gold); box-shadow: 4px 0 #ffea9c, 0 4px #ffea9c, 4px 4px #ffea9c; }
+    .factory-building { z-index: 1; position: relative; width: min(270px, 88%); height: 137px; margin-top: 43px; border: 5px solid #241d3d; background: linear-gradient(90deg,#bf5962 0 28%,#d87a68 28% 70%,#b94f5c 70%); box-shadow: inset 0 -12px #98485a, 8px 8px 0 rgba(0,0,0,.2); }
+    .factory-building::before { content: ""; position: absolute; left: -9px; right: -9px; top: -36px; height: 35px; background: repeating-linear-gradient(90deg,#efaa64 0 48px,#d9875e 48px 54px); border: 5px solid #241d3d; clip-path: polygon(0 100%,0 65%,12% 0,26% 65%,42% 0,56% 65%,72% 0,86% 65%,100% 25%,100% 100%); filter: drop-shadow(0 -3px #241d3d); }
+    .roof-trim { position: absolute; top: 0; left: 0; right: 0; height: 11px; background: repeating-linear-gradient(90deg,#f3b365 0 18px,#db865c 18px 22px); border-bottom: 4px solid #241d3d; }
+    .chimney { z-index: 0; position: absolute; top: 28px; left: calc(50% - 83px); width: 31px; height: 86px; background: repeating-linear-gradient(0deg,#835875 0 16px,#6f496d 16px 20px); border: 5px solid #241d3d; box-shadow: inset 5px 0 #a46a7b; }
+    .chimney::before { content: ""; position: absolute; left: -8px; top: -7px; width: 27px; height: 10px; border: 4px solid #241d3d; background: #bd7682; }
+    .smoke { z-index: 0; position: absolute; left: calc(50% - 84px); top: 8px; width: 12px; height: 12px; background: #b7b2d2; box-shadow: 12px -7px #aaa5c9, 4px -18px #c5c0da; opacity: .72; animation: puff 2.5s steps(4,end) infinite; }
+    .window { position: absolute; top: 49px; width: 27px; height: 30px; background: #f3d779; border: 5px solid #241d3d; box-shadow: inset -5px -5px #c38c59; }
+    .window.one { left: 20px; } .window.two { right: 20px; }
+    .window::after { content: ""; position: absolute; left: 7px; top: -2px; width: 4px; height: 20px; background: #69496c; }
+    .loading-door { position: absolute; bottom: 0; left: calc(50% - 26px); width: 52px; height: 61px; border: 5px solid #241d3d; border-bottom: 0; background: repeating-linear-gradient(0deg,#795070 0 9px,#5e4168 9px 13px); }
+    .press-machine { z-index: 2; position: absolute; left: calc(50% - 26px); bottom: 46px; width: 52px; height: 62px; border: 5px solid #241d3d; background: #6877a0; box-shadow: inset 0 -9px #4e587f; }
+    .press-machine::before { content: ""; position: absolute; left: 11px; top: -19px; width: 14px; height: 20px; background: #edb65d; border: 4px solid #241d3d; }
+    .press-machine::after { content: ""; position: absolute; left: 5px; right: 5px; bottom: 8px; height: 7px; background: #ffd34e; border: 2px solid #8b5a28; }
+    .pipe { z-index: 2; position: absolute; bottom: 50px; right: 9%; width: 31px; height: 34px; border: 5px solid #241d3d; border-bottom: 0; border-radius: 8px 8px 0 0; background: #75a4a0; }
+    .belt { z-index: 2; position: absolute; bottom: 29px; left: 5%; right: 5%; height: 23px; border: 4px solid #241d3d; background: repeating-linear-gradient(90deg,#4b4869 0 14px,#aaa0a8 14px 19px); box-shadow: 0 7px 0 #34314b; }
+    .coin { z-index: 3; position: absolute; bottom: 48px; left: 19%; width: 23px; height: 23px; border-radius: 50%; border: 4px solid #9d6826; background: var(--gold); box-shadow: inset -4px -3px #e39c32; animation: ride 3s linear infinite; }
+    .coin.second { left: 39%; animation-delay: -1s; transform: scale(.8); }
+    .coin.third { left: 62%; animation-delay: -2s; transform: scale(.7); }
+    @keyframes ride { from { translate: -10px 0; } to { translate: 210px 0; } }
+    @keyframes puff { 0%,100% { transform: translateY(0); opacity: .72; } 50% { transform: translateY(-8px); opacity: .35; } }
+    .factory-name { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+    .coin-button { width: min(300px, 100%); min-height: 68px; border: 4px solid #815019; background: var(--gold); color: #392342; box-shadow: 0 6px 0 #684015; font-size: 19px; font-weight: 900; cursor: pointer; touch-action: manipulation; }
+    .coin-button:hover { background: #ffe37a; transform: translateY(-1px); }
+    .coin-button:active { transform: translateY(4px); box-shadow: 0 2px 0 #684015; }
+    button.coin-button:not(:disabled):active { transform: none; translate: 0 5px; box-shadow: 0 1px 0 #684015; }
+    .click-power { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+    .shop { padding: 14px; }
+    .tabs { display: flex; gap: 7px; margin: 0 -2px 13px; padding: 3px 2px 6px; overflow-x: auto; scrollbar-color: #777194 var(--panel); }
+    .tab-button { flex: 0 0 auto; font-weight: bold; padding: 8px 10px; white-space: nowrap; }
+    .tab-button[aria-selected="true"] { background: var(--gold); color: #34223e; }
+    .section-heading { margin: 9px 2px 11px; color: var(--gold); font-size: 15px; }
+    .item-list { display: grid; gap: 9px; }
+    .shop-item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 11px; border: 2px solid #171629; background: var(--panel-light); }
+    .item-name { font-weight: bold; }
+    .item-detail { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .buy-button { min-width: 100px; padding: 10px 9px; border: 2px solid #163d37; background: var(--mint); color: #142a2b; box-shadow: 0 3px 0 #102820; font-weight: 900; cursor: pointer; touch-action: manipulation; }
+    .buy-button:disabled { border-color: #37344b; background: #625e72; color: #cac6d5; box-shadow: none; cursor: not-allowed; }
+    .buy-button:active { box-shadow: 0 0 0 #102820; }
+    .message { min-height: 22px; margin: 12px 2px 0; color: var(--mint); font-size: 12px; }
+    .factory-status { grid-column: 1 / -1; }
+    .factory-status .stat-value { font-size: 18px; }
+    .progress-track { height: 12px; margin: 7px 0; border: 2px solid #111020; background: #171629; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg,#83e6ae,#ffd34e); }
+    .badge-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+    .badge { padding: 10px; border: 2px solid #171629; background: var(--panel-light); color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .badge.unlocked { border-color: #806321; color: var(--gold); }
+    .journal-number { color: var(--mint); font-weight: bold; }
+    .float-text { z-index: 4; position: absolute; left: 50%; top: 55%; color: var(--gold); font-size: 20px; font-weight: bold; pointer-events: none; text-shadow: 2px 2px #352448; animation: float-up .75s ease-out forwards; }
+    @keyframes float-up { to { transform: translate(-50%,-38px); opacity: 0; } }
+    .worker { z-index: 2; position: absolute; bottom: 50px; left: 18%; width: 18px; height: 24px; background: #83e6ae; border: 4px solid #241d3d; box-shadow: 0 -12px 0 -2px #f3cf9b, 10px 5px 0 -5px #241d3d; animation: worker-move 4s steps(4,end) infinite alternate; }
+    @keyframes worker-move { to { translate: 105px 0; } }
+    .footnote { margin: 15px 0 0; color: var(--muted); text-align: center; font-size: 11px; }
+    .modal-backdrop { position: fixed; z-index: 5; inset: 0; display: grid; place-items: center; padding: 18px; background: #0b0a16cc; }
+    .modal-backdrop[hidden] { display: none; }
+    .modal { width: min(440px, 100%); padding: 20px; border: 4px solid var(--edge); background: var(--panel); box-shadow: 0 0 0 3px #484563, 8px 8px #090811; }
+    .modal h2 { margin: 0 0 12px; color: var(--gold); font-size: 20px; }
+    .modal p { color: var(--cream); font-size: 14px; line-height: 1.8; }
+    .modal .small-button { margin-top: 5px; }
+    :focus-visible { outline: 3px solid #fff3a0; outline-offset: 3px; }
+    @media (max-width: 720px) {
+      .shell { padding: 14px 12px calc(18px + env(safe-area-inset-bottom)); }
+      .topbar { align-items: flex-start; }
+      .small-button { padding: 8px 9px; font-size: 12px; }
+      .columns { grid-template-columns: 1fr; gap: 12px; }
+      .factory { padding: 12px; }
+      .factory-scene { min-height: 225px; }
+      .shop { padding: 12px; }
+      .buy-button { min-width: 88px; }
+    }
+    @media (max-width: 390px) {
+      .stats { gap: 8px; }
+      .stat { padding: 10px; }
+      .stat-label { font-size: 11px; }
+      .stat-value { font-size: 21px; }
+      h1 { font-size: 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <h1>無限コイン工場</h1>
+      <nav class="top-actions" aria-label="ゲーム設定">
+        <button class="small-button" id="musicButton" type="button" aria-pressed="false">BGM：OFF</button>
+        <button class="small-button" id="sfxButton" type="button" aria-pressed="false">効果音：OFF</button>
+        <button class="small-button" id="helpButton" type="button">遊び方</button>
+        <button class="small-button" id="resetButton" type="button">最初から</button>
+      </nav>
+    </header>
+
+    <section class="stats" aria-label="工場の状況">
+      <div class="stat"><div class="stat-label">所持コイン</div><div class="stat-value" id="coins">0</div></div>
+      <div class="stat"><div class="stat-label">自動生産</div><div class="stat-value rate" id="rate">毎秒 0 枚</div></div>
+      <div class="stat factory-status"><div class="stat-label">工場エリア</div><div class="stat-value" id="zone">小さな町工場</div></div>
+    </section>
+
+    <div class="columns">
+      <section class="panel factory" aria-label="コイン工場">
+        <div class="factory-scene" aria-hidden="true">
+          <div class="stars"></div><div class="moon"></div>
+          <div class="smoke"></div><div class="chimney"></div>
+          <div class="factory-building"><span class="roof-trim"></span><span class="window one"></span><span class="window two"></span><span class="loading-door"></span></div>
+          <div class="press-machine"></div><div class="pipe"></div>
+          <div class="belt"></div><div class="coin"></div><div class="coin second"></div><div class="coin third"></div><div class="worker"></div>
+        </div>
+        <p class="factory-name" id="factoryName">工場を動かしてコインを作ろう！</p>
+        <button class="coin-button" id="clickButton" type="button">コインを作る！</button>
+        <p class="click-power" id="clickPower">1回のタップ：+1 コイン</p>
+        <p class="click-power" id="boostStatus">工場は通常速度で稼働中</p>
+      </section>
+
+      <section class="panel shop" aria-label="設備と強化">
+        <div class="tabs" role="tablist" aria-label="工場メニュー">
+          <button class="tab-button" id="machinesTab" type="button" role="tab" aria-selected="true" aria-controls="shopContent">設備</button>
+          <button class="tab-button" id="upgradesTab" type="button" role="tab" aria-selected="false" aria-controls="shopContent">強化</button>
+          <button class="tab-button" id="ordersTab" type="button" role="tab" aria-selected="false" aria-controls="shopContent">納品</button>
+          <button class="tab-button" id="achievementsTab" type="button" role="tab" aria-selected="false" aria-controls="shopContent">実績</button>
+          <button class="tab-button" id="collectionTab" type="button" role="tab" aria-selected="false" aria-controls="shopContent">図鑑</button>
+          <button class="tab-button" id="journalTab" type="button" role="tab" aria-selected="false" aria-controls="shopContent">日誌</button>
+          <button class="tab-button" id="factoryTab" type="button" role="tab" aria-selected="false" aria-controls="shopContent">工場</button>
+        </div>
+        <div id="shopContent" role="tabpanel" aria-labelledby="machinesTab"></div>
+        <p class="message" id="message" aria-live="polite"></p>
+      </section>
+    </div>
+    <p class="footnote">この端末のブラウザに自動保存されます。別の端末には引き継がれません。</p>
+  </main>
+
+  <div class="modal-backdrop" id="helpModal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">遊び方</h2>
+      <p>「コインを作る！」を押してコインを集めましょう。設備を買うと、時間とともにコインが自動で増えます。クリック強化を買うと、タップでもっと稼げます。ゲームの進行状況はこのブラウザに自動保存されます。</p>
+      <button class="small-button" id="closeHelp" type="button">ゲームに戻る</button>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const SAVE_KEY = "coin-factory-save-v2";
+      const machines = [
+        { id: "press", name: "コインプレス機", baseCost: 10, rate: 0.2, description: "毎秒 0.2 コインを生産" },
+        { id: "belt", name: "ベルトコンベア", baseCost: 100, rate: 1.5, description: "毎秒 1.5 コインを生産" },
+        { id: "robot", name: "ロボット作業員", baseCost: 1000, rate: 10, description: "毎秒 10 コインを生産" }
+      ];
+      const freshState = () => ({ coins: 0, clickLevel: 0, owned: { press: 0, belt: 0, robot: 0 }, runEarned: 0, lifetimeEarned: 0, clicks: 0, bestRate: 0, prestige: 0, orderLevel: 0, orderProgress: 0, dayKey: new Date().toLocaleDateString("sv-SE"), dayEarned: 0, unlocked: [], boostUntil: 0, musicOn: false, sfxOn: false });
+      let state;
+      let activeTab = "machines";
+      let lastTick = performance.now();
+      let messageTimer;
+
+      const $ = (id) => document.getElementById(id);
+      const coinsEl = $("coins");
+      const rateEl = $("rate");
+      const clickPowerEl = $("clickPower");
+      const shopContent = $("shopContent");
+      const messageEl = $("message");
+      let audioContext = null;
+      let musicTimer = null;
+      let musicStep = 0;
+      let musicEnabled = false;
+      const melody = [659.25, 0, 783.99, 0, 587.33, 0, 523.25, 0, 659.25, 0, 987.77, 0, 783.99, 0, 587.33, 0,
+        523.25, 0, 587.33, 0, 659.25, 0, 783.99, 0, 698.46, 0, 659.25, 0, 587.33, 0, 523.25, 0];
+      const tabs = ["machines", "upgrades", "orders", "achievements", "collection", "journal", "factory"];
+      const tabIds = { machines: "machinesTab", upgrades: "upgradesTab", orders: "ordersTab", achievements: "achievementsTab", collection: "collectionTab", journal: "journalTab", factory: "factoryTab" };
+      const achievements = [
+        { id: "click1", name: "初めての一枚", detail: "コインを1回タップで作る", test: () => state.clicks >= 1, reward: 10 },
+        { id: "click100", name: "名クリック職人", detail: "100回タップする", test: () => state.clicks >= 100, reward: 100 },
+        { id: "press1", name: "最初の機械", detail: "プレス機を1台買う", test: () => state.owned.press >= 1, reward: 25 },
+        { id: "belt1", name: "ライン稼働", detail: "ベルトコンベアを買う", test: () => state.owned.belt >= 1, reward: 100 },
+        { id: "earned1k", name: "千枚突破", detail: "この周回で1,000枚生産", test: () => state.runEarned >= 1000, reward: 250 },
+        { id: "robot1", name: "ロボット導入", detail: "ロボット作業員を買う", test: () => state.owned.robot >= 1, reward: 500 }
+      ];
+      const collection = [
+        { name: "銅コイン", threshold: 0, detail: "工場の最初の一枚" },
+        { name: "銀コイン", threshold: 100, detail: "100枚生産で発見" },
+        { name: "金コイン", threshold: 1000, detail: "1,000枚生産で発見" },
+        { name: "星コイン", threshold: 10000, detail: "10,000枚生産で発見" },
+        { name: "銀河コイン", threshold: 100000, detail: "100,000枚生産で発見" }
+      ];
+      state = loadState();
+
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || localStorage.getItem("coin-factory-save-v1"));
+          if (!saved || typeof saved !== "object") return freshState();
+          const clean = freshState();
+          for (const key of ["coins", "runEarned", "lifetimeEarned", "clicks", "bestRate", "prestige", "orderLevel", "orderProgress", "dayEarned", "boostUntil"]) {
+            if (Number.isFinite(saved[key]) && saved[key] >= 0) clean[key] = saved[key];
+          }
+          clean.clickLevel = Number.isInteger(saved.clickLevel) && saved.clickLevel >= 0 ? Math.min(saved.clickLevel, 100000) : 0;
+          clean.prestige = Math.floor(clean.prestige);
+          clean.orderLevel = Math.floor(clean.orderLevel);
+          clean.unlocked = Array.isArray(saved.unlocked) ? saved.unlocked.filter((id) => achievements.some((item) => item.id === id)) : [];
+          clean.musicOn = false;
+          clean.sfxOn = Boolean(saved.sfxOn);
+          const today = new Date().toLocaleDateString("sv-SE");
+          clean.dayKey = typeof saved.dayKey === "string" ? saved.dayKey : today;
+          if (clean.dayKey !== today) { clean.dayKey = today; clean.dayEarned = 0; }
+          for (const machine of machines) {
+            const count = saved.owned && saved.owned[machine.id];
+            clean.owned[machine.id] = Number.isInteger(count) && count >= 0 ? Math.min(count, 100000) : 0;
+          }
+          return clean;
+        } catch { return freshState(); }
+      }
+
+      function saveState() {
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch { showMessage("保存できませんでした。ブラウザの保存容量を確認してください。"); }
+      }
+
+      function formatNumber(value) {
+        if (value >= 1e12) return Math.floor(value).toExponential(2).replace("e+", "e");
+        return Math.floor(value).toLocaleString("ja-JP");
+      }
+
+      function addCoins(amount, countsAsProduction = true) {
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        state.coins += amount;
+        if (countsAsProduction) {
+          state.runEarned += amount;
+          state.lifetimeEarned += amount;
+          state.dayEarned += amount;
+          state.orderProgress += amount;
+        }
+      }
+
+      function checkAchievements() {
+        for (const item of achievements) {
+          if (!state.unlocked.includes(item.id) && item.test()) {
+            state.unlocked.push(item.id);
+            addCoins(item.reward, false);
+            showMessage(`実績「${item.name}」達成！ ${formatNumber(item.reward)}コイン獲得`);
+            playSfx("achievement");
+          }
+        }
+      }
+
+      function playSfx(kind = "click") {
+        if (!state.sfxOn) return;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        try {
+          audioContext ||= new AudioContextClass();
+          audioContext.resume();
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          const base = kind === "achievement" ? 880 : kind === "buy" ? 520 : 390;
+          oscillator.type = kind === "click" ? "square" : "triangle";
+          oscillator.frequency.setValueAtTime(base, audioContext.currentTime);
+          if (kind === "achievement") oscillator.frequency.exponentialRampToValueAtTime(1320, audioContext.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.045, audioContext.currentTime + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.14);
+          oscillator.connect(gain);
+          gain.connect(audioContext.destination);
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + 0.15);
+        } catch { /* 音が使えない環境でもゲームは続けられます */ }
+      }
+
+      function showFloatText(text) {
+        const scene = document.querySelector(".factory-scene");
+        const floater = document.createElement("span");
+        floater.className = "float-text";
+        floater.textContent = text;
+        scene.appendChild(floater);
+        setTimeout(() => floater.remove(), 800);
+      }
+
+      function productionRate() {
+        const base = machines.reduce((sum, machine) => {
+          const count = state.owned[machine.id];
+          const mergedSets = Math.floor(count / 10);
+          return sum + count * machine.rate * (1 + mergedSets);
+        }, 0);
+        const boost = state.boostUntil > Date.now() ? 2 : 1;
+        return base * (1 + state.prestige * 0.1) * boost;
+      }
+
+      function machineCost(machine) {
+        return Math.ceil(machine.baseCost * Math.pow(1.15, state.owned[machine.id]));
+      }
+
+      function upgradeCost() {
+        return Math.ceil(25 * Math.pow(1.8, state.clickLevel));
+      }
+
+      function currentZone() {
+        if (state.runEarned >= 100000) return { name: "宇宙造幣基地", stage: "space" };
+        if (state.runEarned >= 10000) return { name: "黄金の工場", stage: "gold" };
+        if (state.runEarned >= 1000) return { name: "大きな町工場", stage: "large" };
+        return { name: "小さな町工場", stage: "small" };
+      }
+
+      function render() {
+        coinsEl.textContent = formatNumber(state.coins);
+        rateEl.textContent = `毎秒 ${formatNumber(productionRate())} 枚`;
+        clickPowerEl.textContent = `1回のタップ：+${formatNumber((1 + state.clickLevel) * (1 + state.prestige * 0.1))} コイン`;
+        const zone = currentZone();
+        $("zone").textContent = zone.name;
+        $("factoryName").textContent = `${zone.name}が稼働中！`;
+        const scene = document.querySelector(".factory-scene");
+        scene.dataset.zone = zone.stage;
+        scene.dataset.press = String(state.owned.press > 0);
+        scene.dataset.belt = String(state.owned.belt > 0);
+        scene.dataset.robot = String(state.owned.robot > 0);
+        const remaining = Math.max(0, state.boostUntil - Date.now());
+        $("boostStatus").textContent = remaining ? `広告ブースト：2倍 あと ${Math.ceil(remaining / 60000)} 分` : `生産ボーナス：転生 ${state.prestige}回（+${state.prestige * 10}%）`;
+        document.querySelector(".worker").style.display = state.owned.robot > 0 ? "block" : "none";
+        $("musicButton").textContent = `BGM：${musicEnabled ? "ON" : "OFF"}`;
+        $("musicButton").setAttribute("aria-pressed", String(musicEnabled));
+        $("sfxButton").textContent = `効果音：${state.sfxOn ? "ON" : "OFF"}`;
+        $("sfxButton").setAttribute("aria-pressed", String(state.sfxOn));
+        for (const tab of tabs) $(tabIds[tab]).setAttribute("aria-selected", String(activeTab === tab));
+        shopContent.setAttribute("aria-labelledby", tabIds[activeTab]);
+        ({ machines: renderMachines, upgrades: renderUpgrades, orders: renderOrders, achievements: renderAchievements, collection: renderCollection, journal: renderJournal, factory: renderFactory })[activeTab]();
+      }
+
+      function renderMachines() {
+        shopContent.innerHTML = `<h2 class="section-heading">設備ショップ</h2><div class="item-list">${machines.map((machine) => {
+          const cost = machineCost(machine);
+          const owned = state.owned[machine.id];
+          const sets = Math.floor(owned / 10);
+          return `<article class="shop-item"><div><div class="item-name">${machine.name} × ${formatNumber(owned)}</div><div class="item-detail">${machine.description}<br>10台ごとに生産ラインが合体強化（${sets}段階）<br>価格：${formatNumber(cost)} コイン</div></div><button class="buy-button" type="button" data-buy-machine="${machine.id}" ${state.coins < cost ? "disabled" : ""}>購入</button></article>`;
+        }).join("")}</div>`;
+      }
+
+      function renderUpgrades() {
+        const cost = upgradeCost();
+        shopContent.innerHTML = `<h2 class="section-heading">工場の強化</h2><div class="item-list"><article class="shop-item"><div><div class="item-name">クリック強化 Lv.${formatNumber(state.clickLevel)}</div><div class="item-detail">タップでもらえるコインを +1<br>価格：${formatNumber(cost)} コイン</div></div><button class="buy-button" type="button" data-buy-upgrade ${state.coins < cost ? "disabled" : ""}>強化</button></article></div>`;
+      }
+
+      function renderOrders() {
+        const target = Math.ceil(50 * Math.pow(2, state.orderLevel));
+        const reward = Math.ceil(target * 0.65);
+        const progress = Math.min(100, state.orderProgress / target * 100);
+        shopContent.innerHTML = `<h2 class="section-heading">今日の納品依頼</h2><article class="shop-item"><div><div class="item-name">コイン ${formatNumber(target)} 枚を生産</div><div class="item-detail">進捗：${formatNumber(Math.min(state.orderProgress, target))} / ${formatNumber(target)} 枚<br>達成報酬：${formatNumber(reward)} コイン</div><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div></div><button class="buy-button" type="button" data-claim-order ${state.orderProgress < target ? "disabled" : ""}>受け取る</button></article><p class="item-detail">依頼は達成すると次の依頼に更新されます。</p>`;
+      }
+
+      function renderAchievements() {
+        shopContent.innerHTML = `<h2 class="section-heading">工場の実績</h2><div class="badge-grid">${achievements.map((item) => {
+          const done = state.unlocked.includes(item.id);
+          return `<div class="badge ${done ? "unlocked" : ""}"><strong>${done ? "★ " : "☆ "}${item.name}</strong><br>${item.detail}<br>${done ? "達成済み" : `報酬 ${formatNumber(item.reward)} コイン`}</div>`;
+        }).join("")}</div>`;
+      }
+
+      function renderCollection() {
+        shopContent.innerHTML = `<h2 class="section-heading">コイン図鑑</h2><div class="badge-grid">${collection.map((item) => {
+          const found = state.lifetimeEarned >= item.threshold;
+          return `<div class="badge ${found ? "unlocked" : ""}"><strong>${found ? "● " : "？ "}${found ? item.name : "？？？コイン"}</strong><br>${found ? item.detail : `${formatNumber(item.threshold)} 枚生産で発見`}</div>`;
+        }).join("")}</div>`;
+      }
+
+      function renderJournal() {
+        shopContent.innerHTML = `<h2 class="section-heading">工場日誌</h2><article class="shop-item"><div class="item-detail">今日の生産枚数</div><strong class="journal-number">${formatNumber(state.dayEarned)}</strong></article><article class="shop-item"><div class="item-detail">今回の工場で生産</div><strong class="journal-number">${formatNumber(state.runEarned)}</strong></article><article class="shop-item"><div class="item-detail">これまでの総生産</div><strong class="journal-number">${formatNumber(state.lifetimeEarned)}</strong></article><article class="shop-item"><div class="item-detail">最高生産速度</div><strong class="journal-number">毎秒 ${formatNumber(state.bestRate)} 枚</strong></article>`;
+      }
+
+      function renderFactory() {
+        const next = state.runEarned < 1000 ? 1000 : state.runEarned < 10000 ? 10000 : state.runEarned < 100000 ? 100000 : null;
+        const prestigeGain = Math.floor(Math.sqrt(state.runEarned / 1000000));
+        shopContent.innerHTML = `<h2 class="section-heading">工場の成長</h2><article class="shop-item"><div><div class="item-name">${currentZone().name}</div><div class="item-detail">今周回の生産：${formatNumber(state.runEarned)} 枚${next ? `<br>次の工場エリアまで：${formatNumber(next)} 枚` : "<br>全エリア解放済み"}</div></div></article><article class="shop-item"><div><div class="item-name">設備ライン合体</div><div class="item-detail">同じ設備を10台そろえるごとに、その設備の生産量が追加で100%上がります。</div></div></article><article class="shop-item"><div><div class="item-name">転生：現在 ${state.prestige} 回</div><div class="item-detail">工場をリセットして、1回ごとに永久生産力 +10%。<br>今回の転生ポイント：${formatNumber(prestigeGain)}（1,000,000枚ごとに増加）</div></div><button class="buy-button" type="button" data-prestige ${prestigeGain < 1 ? "disabled" : ""}>転生</button></article><article class="shop-item"><div><div class="item-name">広告ブースト</div><div class="item-detail">広告連携後に、任意視聴で生産速度2倍（10分）を追加予定。</div></div><button class="buy-button" type="button" disabled>連携準備中</button></article><article class="shop-item"><div><div class="item-name">広告なしオプション</div><div class="item-detail">決済サービス導入後に検討。今は広告なしで遊べます。</div></div><button class="buy-button" type="button" disabled>準備中</button></article>`;
+      }
+
+      function showMessage(text) {
+        messageEl.textContent = text;
+        clearTimeout(messageTimer);
+        messageTimer = setTimeout(() => { messageEl.textContent = ""; }, 2200);
+      }
+
+      function playChipNote(frequency, startTime, duration, type, volume) {
+        if (!audioContext || frequency <= 0) return;
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, startTime);
+        gain.gain.setValueAtTime(0.0001, startTime);
+        gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration + 0.02);
+      }
+
+      function scheduleMusicStep() {
+        if (!audioContext || !musicEnabled) return;
+        const now = audioContext.currentTime + 0.025;
+        const note = melody[musicStep % melody.length];
+        playChipNote(note, now, 0.16, "square", 0.035);
+        if (musicStep % 4 === 0) {
+          const bassNotes = [130.81, 164.81, 196, 164.81, 110, 146.83, 164.81, 146.83];
+          playChipNote(bassNotes[Math.floor(musicStep / 4) % bassNotes.length], now, 0.3, "triangle", 0.045);
+        }
+        musicStep += 1;
+      }
+
+      async function toggleMusic() {
+        const button = $("musicButton");
+        if (musicEnabled) {
+          musicEnabled = false;
+          clearInterval(musicTimer);
+          musicTimer = null;
+          if (audioContext) await audioContext.suspend();
+          button.textContent = "BGM：OFF";
+          button.setAttribute("aria-pressed", "false");
+          return;
+        }
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          showMessage("このブラウザではBGMを再生できません。");
+          return;
+        }
+        try {
+          audioContext ||= new AudioContextClass();
+          await audioContext.resume();
+          musicEnabled = true;
+          button.textContent = "BGM：ON";
+          button.setAttribute("aria-pressed", "true");
+          scheduleMusicStep();
+          musicTimer = setInterval(scheduleMusicStep, 250);
+        } catch {
+          showMessage("音楽を開始できませんでした。もう一度お試しください。");
+        }
+      }
+
+      $("clickButton").addEventListener("click", () => {
+        const amount = (1 + state.clickLevel) * (1 + state.prestige * 0.1);
+        addCoins(amount);
+        state.clicks += 1;
+        showFloatText(`+${formatNumber(amount)}`);
+        playSfx("click");
+        checkAchievements();
+        render();
+      });
+
+      shopContent.addEventListener("click", (event) => {
+        const machineId = event.target.closest("[data-buy-machine]")?.dataset.buyMachine;
+        if (machineId) {
+          const machine = machines.find((item) => item.id === machineId);
+          if (!machine) return;
+          const cost = machineCost(machine);
+          if (state.coins < cost) return;
+          state.coins -= cost;
+          state.owned[machine.id] += 1;
+          showMessage(`${machine.name}を購入しました！`);
+          playSfx("buy");
+          checkAchievements();
+          saveState();
+          render();
+          return;
+        }
+        if (event.target.closest("[data-buy-upgrade]")) {
+          const cost = upgradeCost();
+          if (state.coins < cost) return;
+          state.coins -= cost;
+          state.clickLevel += 1;
+          showMessage("クリックを強化しました！");
+          playSfx("buy");
+          saveState();
+          render();
+        }
+      });
+
+      $("machinesTab").addEventListener("click", () => { activeTab = "machines"; render(); });
+      $("upgradesTab").addEventListener("click", () => { activeTab = "upgrades"; render(); });
+      $("musicButton").addEventListener("click", toggleMusic);
+      $("sfxButton").addEventListener("click", () => {
+        state.sfxOn = !state.sfxOn;
+        playSfx("buy");
+        saveState();
+        render();
+      });
+      for (const tab of tabs.slice(2)) {
+        $(tabIds[tab]).addEventListener("click", () => { activeTab = tab; render(); });
+      }
+
+      shopContent.addEventListener("click", (event) => {
+        if (event.target.closest("[data-claim-order]")) {
+          const target = Math.ceil(50 * Math.pow(2, state.orderLevel));
+          if (state.orderProgress < target) return;
+          state.coins += Math.ceil(target * 0.65);
+          state.orderLevel += 1;
+          state.orderProgress -= target;
+          showMessage("納品完了！報酬を受け取りました。");
+          playSfx("achievement");
+          saveState();
+          render();
+        }
+        if (event.target.closest("[data-prestige]")) {
+          const gained = Math.floor(Math.sqrt(state.runEarned / 1000000));
+          if (gained < 1 || !window.confirm(`工場をリセットして転生ポイント${gained}を獲得します。設備・所持コイン・今回の生産記録はリセットされます。続けますか？`)) return;
+          state.prestige += gained;
+          state.coins = 0;
+          state.clickLevel = 0;
+          state.owned = { press: 0, belt: 0, robot: 0 };
+          state.runEarned = 0;
+          state.clicks = 0;
+          state.orderLevel = 0;
+          state.orderProgress = 0;
+          state.boostUntil = 0;
+          showMessage(`転生完了！永久生産力が ${state.prestige * 10}% 上がりました。`);
+          playSfx("achievement");
+          saveState();
+          render();
+        }
+      });
+
+      $("helpButton").addEventListener("click", () => { $("helpModal").hidden = false; $("closeHelp").focus(); });
+      $("closeHelp").addEventListener("click", () => { $("helpModal").hidden = true; $("helpButton").focus(); });
+      $("helpModal").addEventListener("click", (event) => {
+        if (event.target === $("helpModal")) { $("helpModal").hidden = true; $("helpButton").focus(); }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !$("helpModal").hidden) { $("helpModal").hidden = true; $("helpButton").focus(); }
+      });
+
+      $("resetButton").addEventListener("click", () => {
+        if (!window.confirm("コインや設備をすべて消して、最初から始めますか？")) return;
+        state = freshState();
+        saveState();
+        showMessage("新しい工場を始めました。");
+        render();
+      });
+
+      setInterval(() => {
+        const today = new Date().toLocaleDateString("sv-SE");
+        if (state.dayKey !== today) { state.dayKey = today; state.dayEarned = 0; }
+        const now = performance.now();
+        const elapsed = Math.min((now - lastTick) / 1000, 1);
+        lastTick = now;
+        const rate = productionRate();
+        if (rate > 0 && elapsed > 0) {
+          addCoins(rate * elapsed);
+          state.bestRate = Math.max(state.bestRate, rate);
+          checkAchievements();
+          render();
+        }
+      }, 200);
+
+      setInterval(saveState, 10000);
+      window.addEventListener("pagehide", saveState);
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveState(); });
+      render();
+    })();
+  </script>
+</body>
+</html>
+
